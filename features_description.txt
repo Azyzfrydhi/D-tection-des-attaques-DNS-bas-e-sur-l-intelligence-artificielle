@@ -1,0 +1,342 @@
+*Country: This field represents the country where the IP address is registered or located.
+
+*ASN: Autonomous System Number is a unique number assigned to an autonomous system (AS) for the purpose of identifying and exchanging routing information.
+
+*TTL: Time-to-live (TTL) is a value that indicates the lifespan of a packet on a network before it is discarded.
+
+*IP: Internet Protocol (IP) address is a numerical label assigned to each device connected to a computer network that uses the Internet Protocol for communication.
+
+*Domain: A domain is a unique name that identifies a website on the internet.
+
+*Organization: This field represents the organization or company that owns the IP address.
+
+*Registrar: A domain name registrar is a company that manages the reservation of internet domain names.
+
+*TLD: Top-level domain (TLD) is the last segment of the domain name, such as .com, .org, .net, etc.
+
+*SLD: Second-level domain (SLD) is the second part of the domain name, which comes before the TLD.
+
+*Entropy: Entropy is a measure of the randomness or unpredictability of data.
+
+*Num%: Num% is the percentage of numerical characters in the domain name.
+
+*Length: The length of the domain name.
+
+*State: This field represents the state or province where the IP address is located.
+
+*Creation_date: The date when the domain name was created or registered.
+
+*Expiration_date: The date when the domain name registration will expire.
+
+*Registar: The domain registrar responsible for managing the domain name registration.
+
+*Organization: The organization or company that owns the domain name.
+
+*Domain_age: The age of the domain name, calculated as the difference between the current date and the creation date.
+
+*Creation_date_year: The year when the domain name was created.
+
+*Creation_date_month: The month when the domain name was created.
+
+*Creation_date_day: The day when the domain name was created.
+
+*Domain_lifespan: The lifespan of the domain, calculated as the difference between the creation date and the expiration date.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import whois 
+from datetime import datetime
+from scipy.stats import entropy
+
+# Get unique domain names from the DNS traffic data
+domains = dff['question.name'].unique().tolist()
+
+# Enrich the DNS traffic data with WHOIS information
+enriched_data = []
+for domain in domains:
+    try:
+        w = whois.whois(str(domain))
+        creation_date = w.creation_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(w.creation_date, datetime) else None
+        expiration_date = w.expiration_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(w.expiration_date, datetime) else None
+        age_days = None
+        lifespan_days = None
+        if creation_date and expiration_date:
+            age_days = (datetime.now() - datetime.strptime(creation_date, '%Y-%m-%d %H:%M:%S')).days
+            lifespan_days = (datetime.strptime(expiration_date, '%Y-%m-%d %H:%M:%S') - datetime.strptime(creation_date, '%Y-%m-%d %H:%M:%S')).days
+        entropy_score = entropy(list(str(domain).encode('utf-8')))
+        if isinstance(domain, str):
+            num_percent = sum(c.isdigit() for c in domain) / len(domain) 
+        else:
+            num_percent = None  
+            
+        data = {
+            'domain': domain,
+            'creation_date': creation_date,
+            'expiration_date': expiration_date,
+            'registrar': w.registrar,
+            'email': w.emails,
+            'organization': w.org,
+            'country': w.country,
+            'domain_age': age_days,
+            'domain_lifespan': lifespan_days,
+            'length': len(str(domain)),  
+            'state': w.state,
+            'entropy': entropy_score,
+            'num%': num_percent,
+        }
+        enriched_data.append(data)
+    except whois.parser.PywhoisError:
+        pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import whois 
+from datetime import datetime
+import tldextract
+import math
+
+# Get unique domain names from the DNS traffic data
+domains = dff['question.name'].unique().tolist()
+
+# Enrich the DNS traffic data with WHOIS and additional information
+enriched_data = []
+for domain in domains:
+    try:
+        w = whois.whois(str(domain))
+        creation_date = w.creation_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(w.creation_date, datetime) else None
+        expiration_date = w.expiration_date.strftime('%Y-%m-%d %H:%M:%S') if isinstance(w.expiration_date, datetime) else None
+        age_days = None
+        lifespan_days = None
+        if creation_date and expiration_date:
+            age_days = (datetime.now() - datetime.strptime(creation_date, '%Y-%m-%d %H:%M:%S')).days
+            lifespan_days = (datetime.strptime(expiration_date, '%Y-%m-%d %H:%M:%S') - datetime.strptime(creation_date, '%Y-%m-%d %H:%M:%S')).days
+        data = {
+            'domain': domain,
+            'creation_date': creation_date,
+            'expiration_date': expiration_date,
+            'registrar': w.registrar,
+            'registrant_email': w.emails,
+            'registrant_organization': w.org,
+            'registrant_country': w.country,
+            'num_percent': sum(c == '%' for c in domain),
+            'entropy': sum(-p * math.log2(p) for p in (domain.count(c) / len(domain) for c in set(domain))),
+            'asn': None,  # replace with your code to get ASN information
+            'length': len(domain),
+            'domain_age_days': age_days,
+            'domain_lifespan_days': lifespan_days,
+            'state': tldextract.extract(domain).suffix.split('.')[-1]  # get the TLD's country code
+        }
+        enriched_data.append(data)
+    except whois.parser.PywhoisError:
+        pass
+
+# Create a new DataFrame with the enriched data
+enriched_df = pd.DataFrame(enriched_data)
+
+# Merge the enriched DataFrame with the original DNS traffic data based on the domain name
+merged_df = pd.merge(dff, enriched_df, how='left', left_on='question.name', right_on='domain')
+
+print(merged_df)
+
+
+
+
+
+
+
+
+
+
+
+from elasticsearch import Elasticsearch
+import pandas as pd
+es= Elasticsearch ([{"host":"172.29.12.112","port":9200}])
+print(es.ping())
+query ={
+     "size":1000,
+  "query": {
+    "match_all": {}
+  }
+}
+# Execute the query and get the results
+res = es.search(index='packetbeat-*', body=query)
+print(res)
+
+
+@ip= 172.29.50.133 : .\Administrateur  mdp: SSS@3s2022*
+
+
+
+
+
+
+
+
+
+
+
+
+\Device\NPF_{8F433364-AB6F-4551-A0A8-8AFA3BC65F8F}
+
+
+
+
+
+
+
+
+
+
+
+
+# while True:
+     query ={
+             "size":1000,
+         "query": {
+          "match_all": {}
+          }
+      }
+
+
+         # Execute the query and get the results
+     res = es.search(index='packetbeat-*', body=query)
+         #obtaining the source data from Elasticsearch hits and saves it in a list called logs
+     logs = [hit['_source'] for hit in res['hits']['hits']]
+
+
+#     d = pd.DataFrame(logs)
+       # Initialize the scroll
+    # Define the search query
+    
+    # Initialize the scroll
+    
+    
+    
+    
+    
+    
+    
+
+#     scroll_id_file = "point.txt"
+
+#     # Check if the scroll ID file exists
+#     if os.path.exists(scroll_id_file):
+#         # Read the scroll ID from the file
+#         with open(scroll_id_file, "r") as f:
+#             scroll_id = f.read().strip()
+
+#         try:
+#             # Fetch the next 100 hits using the scroll ID
+#             res = es.scroll(scroll_id=scroll_id, scroll='1m')
+#         except NotFoundError:
+#             # Reinitialize the scroll if the scroll ID is no longer valid
+#             query = {
+#                 "size": 2000,
+#                 "query": {
+#                     "match_all": {}
+#                 }
+#             }
+#             res = es.search(index='packetbeat-*', body=query, scroll='1m')
+#             scroll_id = res['_scroll_id']
+
+#     else:
+#         # Initialize the scroll
+#         query = {
+#             "size": 2000,
+#             "query": {
+#                 "match_all": {}
+#             }
+#         }
+
+#         # Execute the query and get the results
+#         res = es.search(index='packetbeat-*', body=query, scroll='1m')
+
+#         # Save the scroll ID
+#         scroll_id = res['_scroll_id']
+
+#     # Save the scroll ID to the file
+#     with open(scroll_id_file, "w") as f:
+#         f.write(scroll_id)
+
+#     # Obtaining the source data from Elasticsearch hits and saves it in a list called logs
+#     logs = [hit['_source'] for hit in res['hits']['hits']]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

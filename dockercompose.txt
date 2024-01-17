@@ -1,0 +1,77 @@
+version: '3'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms4g -Xms4g
+    ports:
+      - 9200:9200
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - elk
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.14.0
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    networks:
+      - elk
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.14.0
+    container_name: logstash
+    volumes:
+      - ./logstash.conf:/home/elk/logstash/config/logstash.conf
+    networks:
+      - elk
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+#    environment:
+ #     MONGO_INITDB_ROOT_USERNAME: aziz
+  #    MONGO_INITDB_ROOT_PASSWORD: pass
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - elk
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.14.0
+    container_name: logstash
+    volumes:
+      - ./logstash.conf:/home/elk/logstash/config/logstash.conf
+    networks:
+      - elk
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+#    environment:
+ #     MONGO_INITDB_ROOT_USERNAME: aziz
+  #    MONGO_INITDB_ROOT_PASSWORD: pass
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - elk
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    depends_on:
+      - mongodb
+    ports:
+      - "8081:8081"
+    links:
+    - mongodb:mongo
+    networks:
+      - elk
+volumes:
+  esdata:
+  mongodb_data:
+networks:
+  elk:
